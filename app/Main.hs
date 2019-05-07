@@ -31,6 +31,7 @@ import GHC.Stack (HasCallStack)
 import Network.Socket (socketToHandle)
 import Network.Simple.TCP (HostPreference(HostAny), ServiceName, SockAddr, accept, listen)
 import System.IO (BufferMode(LineBuffering), Handle, Newline(CRLF), NewlineMode(NewlineMode, inputNL, outputNL), IOMode(ReadWriteMode), hClose, hFlush, hIsEOF, hSetBuffering, hSetEncoding, hSetNewlineMode, latin1)
+import TextUtils
 import Types
 import qualified Data.Text as T
 import qualified Data.Text.IO as T (hGetLine, hPutStr, putStrLn)
@@ -177,14 +178,3 @@ mIf p x = (p >>=) . flip bool x
 maybeVoid :: (HasCallStack, Monad m) => (a -> m ()) -> Maybe a -> m ()
 maybeVoid = maybe (return ())
 
-nl :: Text -> Text
-nl = (<> nlTxt)
-
-nlTxt :: Text
-nlTxt = T.singleton '\n'
-
-dblQuote :: Text -> Text
-dblQuote txt = let a = T.singleton '"' in a <> txt <> a
-
-showTxt :: (Show a) => a -> Text
-showTxt = T.pack . show
