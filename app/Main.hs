@@ -14,24 +14,24 @@ Modules should only export the functions that other modules need.
 
 module Main (main) where
 
-import Control.Concurrent (ThreadId, myThreadId)
+import Control.Concurrent (myThreadId)
 import Control.Concurrent.Async (Async, async, cancel, wait)
 import Control.Concurrent.STM (atomically)
-import Control.Concurrent.STM.TQueue (TQueue, newTQueueIO, readTQueue, writeTQueue)
-import Control.Exception (AsyncException(..), Exception, SomeException, fromException, toException)
+import Control.Concurrent.STM.TQueue (newTQueueIO, readTQueue, writeTQueue)
+import Control.Exception (AsyncException(..), SomeException, fromException, toException)
 import Control.Exception.Lifted (finally, handle, throwTo)
 import Control.Monad (forever, void)
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Reader (ReaderT, ask, runReaderT)
+import Control.Monad.Reader (ask, runReaderT)
 import Data.Bool (bool)
-import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
+import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import Data.Monoid ((<>))
 import Data.Text (Text)
-import Data.Typeable (Typeable)
 import GHC.Stack (HasCallStack)
 import Network.Socket (socketToHandle)
 import Network.Simple.TCP (HostPreference(HostAny), ServiceName, SockAddr, accept, listen)
 import System.IO (BufferMode(LineBuffering), Handle, Newline(CRLF), NewlineMode(NewlineMode, inputNL, outputNL), IOMode(ReadWriteMode), hClose, hFlush, hIsEOF, hSetBuffering, hSetEncoding, hSetNewlineMode, latin1)
+import Types
 import qualified Data.Text as T
 import qualified Data.Text.IO as T (hGetLine, hPutStr, putStrLn)
 
@@ -57,19 +57,6 @@ To fix the thread leakage bug:
 1) Put a "Msg" in every "MsgQueue" indicating that the server is shutting down.
 2) Wait for every talk thread to finish.
 -}
-
-type ChatStack = ReaderT Env IO
-type Env       = IORef ChatState
-type MsgQueue  = TQueue Msg
-
-data ChatState = ChatState { listenThreadId :: Maybe ThreadId } -- TODO: We'll need to put all message queues in the state.
-
-data Msg = FromClient Text
-         | FromServer Text
-         | Dropped
-
-data PleaseDie = PleaseDie deriving (Show, Typeable)
-instance Exception PleaseDie
 
 initChatState :: ChatState
 initChatState = ChatState Nothing
