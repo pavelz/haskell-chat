@@ -20,7 +20,7 @@ type ChatStack = ReaderT Env IO
 type Env       = IORef ChatState
 type MsgQueue  = TQueue Msg
 
-data ChatState = ChatState { listenThreadId :: Maybe ThreadId } -- TODO: We'll need to put all message queues in the state.
+newtype ChatState = ChatState { listenThreadId :: Maybe ThreadId } -- TODO: We'll need to put all message queues in the state.
 
 data Msg = FromClient Text
          | FromServer Text

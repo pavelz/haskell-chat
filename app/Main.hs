@@ -1,40 +1,29 @@
-{-# LANGUAGE LambdaCase, OverloadedStrings, ViewPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wall -Werror -Wno-type-defaults #-}
-
-{-
-TODO:
-Presently all the code is here, in this file. We need to properly organize the code into modules.
-This file can be the only file in the "app" directory.
-Under "src", there will be a number of distinct files/modules:
-* One module should contain all our data type declarations and type aliases. Doing this helps to avoid circular imports in large apps.
-* Other modules can be created based on theme. For example, one module might contain "Text" utility functions.
-* You'll probably want to put "threadServer" and the functions it calls ("interp") in a single module.
-Modules should only export the functions that other modules need.
--}
 
 module Main (main) where
 
 import Control.Concurrent (myThreadId)
-import Control.Concurrent.Async (Async, async, cancel, wait)
-import Control.Concurrent.STM (atomically)
-import Control.Concurrent.STM.TQueue (newTQueueIO, readTQueue, writeTQueue)
-import Control.Exception (AsyncException(..), SomeException, fromException, toException)
-import Control.Exception.Lifted (finally, handle, throwTo)
+import Control.Concurrent.Async (async, cancel, wait)
+import Control.Concurrent.STM.TQueue (newTQueueIO)
+import Control.Exception (AsyncException(..), SomeException, fromException)
+import Control.Exception.Lifted (finally, handle)
 import Control.Monad (forever, void)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (ask, runReaderT)
-import Data.IORef (atomicModifyIORef', newIORef, readIORef)
+import Data.IORef (newIORef)
 import Data.Monoid ((<>))
-import Data.Text (Text)
 import GHC.Stack (HasCallStack)
 import Network.Socket (socketToHandle)
 import Network.Simple.TCP (HostPreference(HostAny), ServiceName, SockAddr, accept, listen)
-import System.IO (BufferMode(LineBuffering), Handle, Newline(CRLF), NewlineMode(NewlineMode, inputNL, outputNL), IOMode(ReadWriteMode), hClose, hFlush, hIsEOF, hSetBuffering, hSetEncoding, hSetNewlineMode, latin1)
+import Server
+import System.IO (BufferMode(LineBuffering), Handle, Newline(CRLF), NewlineMode(NewlineMode, inputNL, outputNL), IOMode(ReadWriteMode), hClose, hIsEOF, hSetBuffering, hSetEncoding, hSetNewlineMode, latin1)
 import TextUtils
+import ThreadUtils
 import Types
 import Utils
 import qualified Data.Text as T
-import qualified Data.Text.IO as T (hGetLine, hPutStr, putStrLn)
+import qualified Data.Text.IO as T (hGetLine, putStrLn)
 
 {-
 To connect:
@@ -110,62 +99,6 @@ threadReceive :: HasCallStack => Handle -> MsgQueue -> ChatStack () -- TODO: Han
 threadReceive h mq = mIf (liftIO . hIsEOF $ h) (writeMsg mq Dropped) $ do
     receive mq =<< liftIO (T.hGetLine h)
     threadReceive h mq
-
-{-
-This thread polls the client's message queue and processes everything that comes down the queue.
-It is named "threadServer" because this is where the bulk of server operations and logic reside.
-But keep in mind that this function is executed for every client, and thus the code we write here is written from the standpoint of a single client (ie, the arguments to this function are the handle and message queue of a single client).
-(Of course, we are in the "ChatStack" so we have access to the global shared state.)
--}
-threadServer :: HasCallStack => Handle -> MsgQueue -> ChatStack () -- TODO: Handle exceptions.
-threadServer h mq = readMsg mq >>= let loop = (>> threadServer h mq) in \case
-  FromClient txt -> loop . interp mq $ txt
-  FromServer txt -> loop . liftIO $ T.hPutStr h txt >> hFlush h
-  Dropped        -> return () -- This kills the crab.
-
-interp :: HasCallStack => MsgQueue -> Text -> ChatStack ()
-interp mq txt = case T.toLower txt of
-  "/quit"  -> send mq "See you next time!" >> writeMsg mq Dropped
-  "/throw" -> throwToListenThread . toException $ PleaseDie -- For illustration/testing.
-  _        -> send mq $ "I see you said, " <> dblQuote txt
-
-{-
-The Haskell language, software transactional memory, and this app are all architected in such a way that we need not concern ourselves with the usual pitfalls of sharing state across threads. This automatically rules out a whole class of potential bugs! Just remember the following:
-1) If you are coding an operation that simply needs to read the state, use the "getState" helper function.
-2) If you are coding an operation that needs to update the state, you must bundle the operation into an atomic unit: that is, a single function passed into the "modifyState" helper function. (The function passed to "modifyState" is itself passed the latest state.)
-It's ensured that only one thread can modify the state (via "modifyState") at a time.
--}
-getState :: HasCallStack => ChatStack ChatState
-getState = liftIO . readIORef =<< ask
-
-modifyState :: HasCallStack => (ChatState -> (ChatState, a)) -> ChatStack a
-modifyState f = ask >>= \ref -> liftIO . atomicModifyIORef' ref $ f
-
-readMsg :: HasCallStack => MsgQueue -> ChatStack Msg
-readMsg = liftIO . atomically . readTQueue
-
-writeMsg :: HasCallStack => MsgQueue -> Msg -> ChatStack ()
-writeMsg mq = liftIO . atomically . writeTQueue mq
-
-send :: HasCallStack => MsgQueue -> Text -> ChatStack ()
-send mq = writeMsg mq . FromServer . nl
-
-receive :: HasCallStack => MsgQueue -> Text -> ChatStack ()
-receive mq = writeMsg mq . FromClient
-
--- Spawn a new thread in the "ChatStack".
-runAsync :: HasCallStack => ChatStack () -> ChatStack (Async ())
-runAsync f = liftIO . async . runReaderT f =<< ask
-
-{-
-Note that we don't use the "Async" library here because the listen thread is the main thread: we didn't start it ourselves via the "async" function, and we have no "Async" data for it.
-When you do have an "Async" object, you can use the "asyncThreadId" function to get the thread ID for the "Async".
--}
-throwToListenThread :: HasCallStack => SomeException -> ChatStack ()
-throwToListenThread e = maybeVoid (`throwTo` e) . listenThreadId =<< getState
-
---------------------
--- Misc. bindings and utility functions
 
 port :: ServiceName
 port = "9696"
