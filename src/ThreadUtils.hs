@@ -8,11 +8,14 @@ module ThreadUtils
     , send
     , receive
     , runAsync
+    , throwToListenThread
     ) where
 
 import Control.Concurrent.Async (Async, async)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TQueue (readTQueue, writeTQueue)
+import Control.Exception (SomeException)
+import Control.Exception.Lifted (throwTo)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (ask, runReaderT)
 import Data.IORef (atomicModifyIORef', readIORef)
@@ -20,6 +23,7 @@ import Data.Text
 import GHC.Stack (HasCallStack)
 import Types
 import TextUtils
+import Utils
 
 {-
 The Haskell language, software transactional memory, and this app are all architected in such a way that we need not concern ourselves with the usual pitfalls of sharing state across threads. This automatically rules out a whole class of potential bugs! Just remember the following:
@@ -48,3 +52,11 @@ receive mq = writeMsg mq . FromClient
 -- Spawn a new thread in the "ChatStack".
 runAsync :: HasCallStack => ChatStack () -> ChatStack (Async ())
 runAsync f = liftIO . async . runReaderT f =<< ask
+
+{-
+Note that we don't use the "Async" library here because the listen thread is the main thread: we didn't start it ourselves via the "async" function, and we have no "Async" data for it.
+When you do have an "Async" object, you can use the "asyncThreadId" function to get the thread ID for the "Async".
+-}
+throwToListenThread :: HasCallStack => SomeException -> ChatStack ()
+throwToListenThread e = maybeVoid (`throwTo` e) . listenThreadId =<< getState
+
