@@ -6,6 +6,7 @@ import Control.Monad.Reader (runReaderT)
 import Data.IORef (newIORef)
 import GHC.Stack (HasCallStack)
 import Listen
+import Network.Simple.TCP (ServiceName)
 import Types
 
 {-
@@ -35,5 +36,8 @@ initChatState :: ChatState
 initChatState = ChatState Nothing
 
 main :: HasCallStack => IO ()
-main = runReaderT threadListen =<< newIORef initChatState
+main = runReaderT (threadListen port) =<< newIORef initChatState
+
+port :: ServiceName
+port = "9696"
 
