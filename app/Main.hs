@@ -23,7 +23,6 @@ import Control.Exception.Lifted (finally, handle, throwTo)
 import Control.Monad (forever, void)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (ask, runReaderT)
-import Data.Bool (bool)
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import Data.Monoid ((<>))
 import Data.Text (Text)
@@ -33,6 +32,7 @@ import Network.Simple.TCP (HostPreference(HostAny), ServiceName, SockAddr, accep
 import System.IO (BufferMode(LineBuffering), Handle, Newline(CRLF), NewlineMode(NewlineMode, inputNL, outputNL), IOMode(ReadWriteMode), hClose, hFlush, hIsEOF, hSetBuffering, hSetEncoding, hSetNewlineMode, latin1)
 import TextUtils
 import Types
+import Utils
 import qualified Data.Text as T
 import qualified Data.Text.IO as T (hGetLine, hPutStr, putStrLn)
 
@@ -169,12 +169,4 @@ throwToListenThread e = maybeVoid (`throwTo` e) . listenThreadId =<< getState
 
 port :: ServiceName
 port = "9696"
-
--- Monadic "if".
-mIf :: (HasCallStack, Monad m) => m Bool -> m a -> m a -> m a
-mIf p x = (p >>=) . flip bool x
-
--- Operate on a "Maybe" in a monad. Do nothing on "Nothing".
-maybeVoid :: (HasCallStack, Monad m) => (a -> m ()) -> Maybe a -> m ()
-maybeVoid = maybe (return ())
 
