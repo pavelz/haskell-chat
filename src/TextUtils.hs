@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wall -Werror -Wno-type-defaults #-}
 
 module TextUtils
     ( nl

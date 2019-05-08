@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wall -Werror -Wno-type-defaults #-}
 
 module Types
     ( ChatStack
@@ -8,7 +9,7 @@ module Types
     , PleaseDie(..)
     ) where
 
-import Control.Concurrent (ThreadId(..))
+import Control.Concurrent (ThreadId)
 import Control.Concurrent.STM.TQueue (TQueue)
 import Control.Exception (Exception)
 import Control.Monad.Reader (ReaderT)
