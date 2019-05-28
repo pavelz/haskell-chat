@@ -26,6 +26,7 @@ newtype ChatState = ChatState { listenThreadId :: Maybe ThreadId } -- TODO: We'l
 data Msg = FromClient Text
          | FromServer Text
          | Dropped
+         | Shutdown
 
 data PleaseDie = PleaseDie deriving (Show, Typeable)
 instance Exception PleaseDie

@@ -5,7 +5,8 @@ module Server
     ( threadServer
     ) where
 
-import Control.Exception (toException)
+import Control.Exception (toException, SomeException)
+import Control.Exception.Lifted (handle, throwIO)
 import Control.Monad.IO.Class (liftIO)
 import Data.Text
 import GHC.Stack (HasCallStack)
@@ -22,15 +23,22 @@ It is named "threadServer" because this is where the bulk of server operations a
 But keep in mind that this function is executed for every client, and thus the code we write here is written from the standpoint of a single client (ie, the arguments to this function are the handle and message queue of a single client).
 (Of course, we are in the "ChatStack" so we have access to the global shared state.)
 -}
-threadServer :: HasCallStack => Handle -> MsgQueue -> ChatStack () -- TODO: Handle exceptions.
-threadServer h mq = readMsg mq >>= let loop = (>> threadServer h mq) in \case
+threadServer :: HasCallStack => Handle -> MsgQueue -> ChatStack ()
+threadServer h mq = handle serverExHandler $ readMsg mq >>= let loop = (>> threadServer h mq) in \case
   FromClient txt -> loop . interp mq $ txt
   FromServer txt -> loop . liftIO $ T.hPutStr h txt >> hFlush h
   Dropped        -> return () -- This kills the crab.
+  Shutdown       -> return ()
+
+serverExHandler :: HasCallStack => SomeException -> ChatStack ()
+serverExHandler _ = throwToListenThread . toException $ PleaseDie
+  {- serverExHandler e = case fromException e of
+  _ -> throwToListenThread . toException $ PleaseDie
+  -}
 
 interp :: HasCallStack => MsgQueue -> Text -> ChatStack ()
 interp mq txt = case T.toLower txt of
   "/quit"  -> send mq "See you next time!" >> writeMsg mq Dropped
-  "/throw" -> throwToListenThread . toException $ PleaseDie -- For illustration/testing.
+  "/throw" -> throwIO PleaseDie
   _        -> send mq $ "I see you said, " <> dblQuote txt
 
