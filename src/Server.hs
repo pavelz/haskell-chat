@@ -31,10 +31,7 @@ threadServer h mq = handle serverExHandler $ readMsg mq >>= let loop = (>> threa
   Shutdown       -> return ()
 
 serverExHandler :: HasCallStack => SomeException -> ChatStack ()
-serverExHandler _ = throwToListenThread . toException $ PleaseDie
-  {- serverExHandler e = case fromException e of
-  _ -> throwToListenThread . toException $ PleaseDie
-  -}
+serverExHandler = throwToListenThread . toException
 
 interp :: HasCallStack => MsgQueue -> Text -> ChatStack ()
 interp mq txt = case T.toLower txt of

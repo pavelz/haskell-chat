@@ -8,6 +8,7 @@ import GHC.Stack (HasCallStack)
 import Listen
 import Network.Simple.TCP (ServiceName)
 import Types
+import qualified Data.IntMap as IM
 
 {-
 To connect:
@@ -33,7 +34,7 @@ To fix the thread leakage bug:
 -}
 
 initChatState :: ChatState
-initChatState = ChatState Nothing
+initChatState = ChatState Nothing IM.empty
 
 main :: HasCallStack => IO ()
 main = runReaderT (threadListen port) =<< newIORef initChatState

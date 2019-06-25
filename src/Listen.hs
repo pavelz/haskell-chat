@@ -9,9 +9,12 @@ import Control.Concurrent (myThreadId)
 import Control.Concurrent.Async (async)
 import Control.Exception (AsyncException(..), SomeException, fromException)
 import Control.Exception.Lifted (finally, handle)
-import Control.Monad (forever, void)
+import Control.Monad (forever)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (ask, runReaderT)
+import qualified Data.IntMap as IM
+import Data.List ((\\))
+import Data.IORef (atomicModifyIORef')
 import GHC.Stack (HasCallStack)
 import Network.Simple.TCP (HostPreference(HostAny), ServiceName, accept, listen)
 import Network.Socket (socketToHandle)
@@ -39,7 +42,10 @@ listenHelper p = handle listenExHandler $ ask >>= \env ->
         talker (clientSocket, remoteAddr) = do
             T.putStrLn . T.concat $ [ "Connected to ", showTxt remoteAddr, "." ]
             h <- socketToHandle clientSocket ReadWriteMode
-            void . async . runReaderT (threadTalk h remoteAddr) $ env -- TODO: Store the talk thread's "Async" data in the shared state.
+            a <- async . runReaderT (threadTalk h remoteAddr) $ env
+            atomicModifyIORef' env $ \cs -> let asyncsMap = talkAsyncs cs
+                                                nextKey = head $ [1..] \\ IM.keys asyncsMap
+                                            in (cs { talkAsyncs = IM.insert nextKey a asyncsMap },  ())
     in listener
 
 listenExHandler :: HasCallStack => SomeException -> ChatStack ()
